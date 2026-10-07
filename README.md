@@ -1,152 +1,286 @@
-# JORC — Joint Task Offloading and Resource Allocation with Data Caching in UAV-Aided MEC
+<p align="center">
+  <img src="assets/logo.svg" alt="JORC logo" width="120">
+</p>
 
-A close implementation of the paper
+<h1 align="center">JORC</h1>
+
+<p align="center">
+  <b>Joint Task Offloading and Resource Allocation with Data Caching in UAV-Aided Mobile Edge Computing</b><br>
+  A close, open-source implementation of the <i>Sensors</i> 2026 paper
+</p>
+
+<p align="center">
+  <a href="https://www.mdpi.com/1424-8220/26/15/4966"><img src="https://img.shields.io/badge/paper-Sensors%202026-blue" alt="Paper"></a>
+  <a href="https://doi.org/10.3390/s26154966"><img src="https://img.shields.io/badge/DOI-10.3390%2Fs26154966-blue" alt="DOI"></a>
+  <img src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12">
+  <img src="https://img.shields.io/badge/PyTorch-2.5-EE4C2C?logo=pytorch&logoColor=white" alt="PyTorch 2.5">
+  <img src="https://img.shields.io/badge/tests-25%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License">
+</p>
+
+---
+
+## Overview
+
+This repository is a close implementation of
 
 > T. Baidya and S. Moh, "Joint Task Offloading and Resource Allocation with Data Caching in UAV-Aided Mobile
 > Edge Computing Networks for Latency-Sensitive Applications," *Sensors*, vol. 26, 4966, 2026.
-> doi:10.3390/s26154966 — https://www.mdpi.com/1424-8220/26/15/4966
+> [https://www.mdpi.com/1424-8220/26/15/4966](https://www.mdpi.com/1424-8220/26/15/4966)
 
-This repository implements the paper's system model, optimisation problem, SAC-based JORC algorithm (Alg. 1),
-hybrid LFU-LRU task-result caching (Alg. 2), all baselines and pipelines for all figures. Parameters and
-implementation choices are documented in [`REPRODUCTION_ASSUMPTIONS.md`](REPRODUCTION_ASSUMPTIONS.md), and each
-is a configuration switch. Implementation notes and validation are in
-[`REPRODUCTION_REPORT.md`](REPRODUCTION_REPORT.md).
+In JORC, user devices offload computation tasks to UAVs equipped with edge servers, which can further forward
+them to a base station. A **soft actor-critic (SAC)** agent jointly decides where each task runs and how much
+transmit power and CPU it receives. A **hybrid LFU-LRU cache** stores task results so repeated requests are
+served without recomputation.
 
 > **Status:** The exact implementation is under development for further analysis.
+
+## Table of contents
+
+- [Highlights](#highlights)
+- [Quick start](#quick-start)
+- [How it works](#how-it-works)
+- [Repository structure](#repository-structure)
+- [Running experiments](#running-experiments)
+- [Configuration](#configuration)
+- [Reproducibility](#reproducibility)
+- [Testing](#testing)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [Citation](#citation)
+- [License](#license)
+
+## Highlights
+
+- **Complete method:** system model, optimisation problem, SAC agent (Alg. 1) and hybrid caching (Alg. 2)
+- **All baselines:** PPO, DDPG and A3C with caching; SAC without caching; LFU, LRU and Random replacement
+- **Every figure scripted:** experiment definitions and plotting for Figs. 3–15
+- **Traceable equations:** each paper equation maps to a named function in the code
+- **Parameter provenance:** every value in the config is tagged by its source (paper, literature or implementation choice)
+- **Reproducible by design:** fixed seeds, common random numbers across methods, raw JSON per run, resumable sweeps
+- **Statistics included:** 95 % confidence intervals over seeds and paired Wilcoxon signed-rank tests
+- **Tested:** 25 unit and integration tests covering equations, constraints, caching and the learning agent
+
+## Quick start
+
+```bash
+git clone <repository-url> && cd jorc-reproduction
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt          # or: conda env create -f environment.yml
+
+python -m pytest -q tests                # verify the installation (~1 min)
+bash scripts/run_all.sh smoke            # run the full pipeline at a small scale
+```
+
+Tested with Python 3.12, PyTorch 2.5.1 (CPU), NumPy 2.x and SciPy 1.x.
+
+## How it works
+
+### System model
+
+| Component | Description |
+|---|---|
+| Network | One base station at (0, 0), M UAVs at altitude H = 100 m, N user devices |
+| Channel | Line-of-sight gain h = h₀ / (H² + d²); OFDMA uplink R = Bₙ log₂(1 + P h / (Bₙ N₀)) |
+| Execution options | Locally on the device, on the assigned UAV, or on the base station via the UAV backhaul |
+| Cost | Cₙ = 0.5 · L / Lᵐᵃˣ + 0.5 · E / Eᵐᵃˣ, summed over users |
+| Constraints | One execution location per task, deadlines, 0 < P ≤ Pₘₐₓ, total CPU share ≤ 1 per server |
+| Caching | Results of tasks executed on a UAV or the base station are cached there and reused on repeat requests |
+
+### Algorithm
+
+1. **Cache check:** each request is looked up in the UAV cache, then the base-station cache. Hits are served immediately.
+2. **SAC decision:** for cache misses, the actor outputs five values per user: three location scores (argmax gives the execution site), a transmit power and a CPU share.
+3. **Execution:** latency, energy and cost follow eqs. (4)–(17); the reward is the negative system cost.
+4. **Caching:** new results are inserted; when a cache is full, the entry with the lowest score
+   H(T) = δ·F(T) + (1 − δ)/(t − L(T)) is evicted, and δ adapts to the observed request repetition rate.
+
+**SAC settings:** twin critics with target networks, automatic temperature (α₀ = 0.2, target entropy −5N),
+3 × 400 ReLU layers, Adam (lr 1e-4), γ = 0.8, τ = 0.005, replay buffer 10⁶, batch 64, one gradient step per
+environment step.
+
+### Paper equations in the code
+
+| Paper | Code |
+|---|---|
+| Eq. (1)–(2): channel and uplink rate | `src/jorc/channel_model.py` |
+| Eq. (4)–(17): latency, energy, cost | `src/jorc/cost_model.py` |
+| Eq. (19e), (19f), (21a), (21b): constraints and action decoding | `src/jorc/offloading.py` |
+| Eq. (20)–(22): state, action, reward | `src/jorc/env.py` |
+| Eq. (23)–(32), Algorithm 1: SAC | `src/jorc/agents/sac.py` |
+| Eq. (14), (33), (34), Algorithm 2: caching | `src/jorc/caching.py`, `src/jorc/env.py` |
+| Sec. 6.3: performance metrics | `src/jorc/metrics.py` |
 
 ## Repository structure
 
 ```
-configs/paper_default.yaml   all parameters, each tagged [A]-[E] (provenance)
-configs/figures.yaml         experiment definitions for Figs. 3-15
-configs/baselines.yaml       compared methods and cache-replacement policies
-configs/scales.yaml          compute profiles: paper | reduced | smoke
-configs/sensitivity.yaml     one-at-a-time parameter variations
-data/paper_reported_values.yaml   numbers stated in the paper's text (comparison only)
-src/jorc/
-  utils.py           config loading, unit conversions, seeds, CIs
-  channel_model.py   eq.(1)-(2), coverage, backhaul
-  task_model.py      task catalogue + Zipf requests
-  system_model.py    BS/UAV/UD geometry, association, mobility
-  cost_model.py      eq.(4)-(17)
-  offloading.py      action decoding (21a/b), (19e), (19f) projection
-  caching.py         task-result cache: hybrid eq.(33)/(34), LFU, LRU, Random
-  env.py             MDP: state (20), action (21), reward (22), Alg. 2 flow
-  agents/            sac.py (Alg. 1), ppo.py, ddpg.py, a3c.py, common.py
-  baselines.py       method registry with the paper's labels
-  training.py        training / evaluation loops
-  metrics.py         Sec. 6.3 metrics
-  diagnostics.py     training-free reference policies (sanity checks only)
-experiments/
-  run_main_experiment.py   one method / configuration / seed(s)
-  reproduce_figures.py     Figs. 3-15 (resumable; raw JSON per run)
-  reproduce_tables.py      Table 3 with provenance, paper comparison, Wilcoxon tests
-  sensitivity_analysis.py  parameter sensitivity
-  cache_capacity_diagnostic.py  cache module at paper request volume (Figs. 14-15 setting)
-tests/                     25 unit/integration tests
-scripts/run_all.sh         end-to-end pipeline
-results/                   generated outputs
+jorc-reproduction/
+├── configs/
+│   ├── paper_default.yaml       # all parameters, tagged by source
+│   ├── figures.yaml             # experiment definitions for Figs. 3–15
+│   ├── baselines.yaml           # compared methods and cache policies
+│   ├── scales.yaml              # compute profiles: smoke | reduced | paper
+│   └── sensitivity.yaml         # parameter variations
+├── src/jorc/
+│   ├── channel_model.py         # channel, coverage, backhaul
+│   ├── task_model.py            # task catalogue and request popularity
+│   ├── system_model.py          # BS / UAV / device geometry and mobility
+│   ├── cost_model.py            # latency, energy and cost
+│   ├── offloading.py            # action decoding and constraint projection
+│   ├── caching.py               # hybrid LFU-LRU, LFU, LRU, Random caches
+│   ├── env.py                   # MDP environment
+│   ├── agents/                  # SAC, PPO, DDPG, A3C
+│   ├── baselines.py             # method registry
+│   ├── training.py              # training and evaluation loops
+│   ├── metrics.py               # performance metrics
+│   ├── diagnostics.py           # training-free reference policies
+│   └── utils.py                 # config loading, units, seeding, statistics
+├── experiments/
+│   ├── run_main_experiment.py   # one method / configuration / seed
+│   ├── reproduce_figures.py     # Figs. 3–15
+│   ├── reproduce_tables.py      # parameter table, comparisons, significance tests
+│   ├── sensitivity_analysis.py  # parameter sensitivity
+│   └── cache_capacity_diagnostic.py
+├── tests/                       # 25 tests
+├── data/                        # values stated in the paper (for comparison)
+├── scripts/run_all.sh           # end-to-end pipeline
+└── results/                     # generated outputs
 ```
 
-## Model summary
+## Running experiments
 
-One BS at (0,0), M UAVs at altitude H = 100 m, N UDs. Each UD is served by one UAV; offloading requires
-d ≤ H tanθ. Channel h = h0/(H² + d²); OFDMA uplink R = B_n log2(1 + P h/(B_n N0)). A task (D_in, W, D_out, L^max)
-runs locally (W/f_n, k f_n² W), at the UAV (uplink + W/(sF_u), k(sF_u)²W) or at the BS via the UAV backhaul
-(+ D_in/R_{m,b}, P_{m,b}D_in/R_{m,b}, W/(sF_b), k(sF_b)²W). Cost C_n = 0.5 L/L^max + 0.5 E/E^max; the problem
-minimises Σ_n C_n subject to one-hot offloading, deadlines, 0 < P ≤ P_max and Σ s ≤ 1 per server.
-Results of tasks executed at a UAV/BS are cached there; repeat requests are served at negligible cost.
-
-## Algorithm summary
-
-* **JORC.** Per slot, every request is first checked in the UAV (then BS) cache. For misses, a SAC actor outputs
-  5 values per user (3 location scores → argmax, transmit power, CPU share). SAC: twin critics + target critics,
-  automatic temperature (α0 = 0.2, target entropy −5N), 3×400 ReLU, Adam 1e−4, γ = 0.8, τ = 0.005, buffer 1e6,
-  batch 64, one gradient step per environment step. Results are cached; when full, the entry with the lowest
-  H(T) = δF(T) + (1−δ)/(t − L(T)) is evicted, and δ is adapted from the observed repetition rate.
-* **Baselines.** PPO / DDPG / A3C with the same caching; SAC without caching; LFU / LRU / Random replacement.
-
-## Installation
+### Single run
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt          # or: conda env create -f environment.yml
-python -m pytest -q tests                # 25 tests, ~1 min
-```
-Tested with Python 3.12, PyTorch 2.5.1 (CPU), NumPy 2.x, SciPy 1.x.
-
-## Configuration
-
-All parameters live in `configs/paper_default.yaml`. Any script accepts overrides:
-`--set system.n_users=60 caching.policy=lru`. Scales: `--scale smoke | reduced | paper`.
-
-## Running
-
-```bash
-# main experiment (paper default point N=100, M=2), one seed, paper budget
+# JORC at the paper's default point (N = 100 users, M = 2 UAVs), seed 0
 python experiments/run_main_experiment.py --method JORC --scale paper --seeds 0 --checkpoint
-
-# all figures (resumable; raw results in results/<scale>/runs, plots in results/<scale>/figures)
-python experiments/reproduce_figures.py --scale paper
-python experiments/reproduce_figures.py --scale paper --figures fig4_7_12      # Figs. 4, 5, 6, 7, 12
-python experiments/reproduce_figures.py --scale paper --figures fig8_11_13     # Figs. 8, 9, 10, 11, 13
-python experiments/reproduce_figures.py --scale paper --figures fig3 fig14 fig15
-
-python experiments/reproduce_tables.py --scale paper     # tables in results/paper/tables
-python experiments/sensitivity_analysis.py               # training-free part (minutes)
-python experiments/sensitivity_analysis.py --train --scale reduced
-python experiments/cache_capacity_diagnostic.py --units GB   # and --units MB
-bash scripts/run_all.sh smoke                             # whole pipeline at smoke scale
 ```
 
-A paper-scale run (2000 episodes × 1000 steps, N = 100) takes roughly 26 CPU-hours on a single core.
+Available methods: `JORC`, `"PPO with caching"`, `"DDPG with caching"`, `"A3C with caching"`, `"SAC without caching"`.
 
-### Expected outputs
+### Figures
+
+| Figure(s) | What varies | Metric(s) | Command flag |
+|---|---|---|---|
+| 3 | Training episodes | Episode reward | `--figures fig3` |
+| 4, 5, 6, 7, 12 | Number of users (20–120) | Latency, energy, cost, STCR, offloading ratio | `--figures fig4_7_12` |
+| 8, 9, 10, 11, 13 | Number of UAVs (1–8) | Latency, energy, cost, STCR, offloading ratio | `--figures fig8_11_13` |
+| 14 | UAV cache capacity (2–32 GB) | Cache hit ratio at UAVs | `--figures fig14` |
+| 15 | BS cache capacity (10–160 GB) | Cache hit ratio at BS | `--figures fig15` |
+
+```bash
+python experiments/reproduce_figures.py --scale paper                       # all figures
+python experiments/reproduce_figures.py --scale paper --figures fig4_7_12   # a subset
+```
+
+Sweeps are resumable: each completed run is saved as JSON and skipped on restart.
+
+### Tables and analysis
+
+```bash
+python experiments/reproduce_tables.py --scale paper          # provenance, comparison, Wilcoxon tables
+python experiments/sensitivity_analysis.py                    # training-free sensitivity (minutes)
+python experiments/sensitivity_analysis.py --train --scale reduced
+python experiments/cache_capacity_diagnostic.py --units GB
+```
+
+### Compute scales
+
+| Scale | Episodes × steps | Seeds | Purpose |
+|---|---|---|---|
+| `smoke` | 4 × 50 | 2 | Pipeline check (minutes) |
+| `reduced` | 40 × 100 | 3 | Quick exploration |
+| `paper` | 2000 × 1000 | 10 | Paper training budget (~26 CPU-hours per run at N = 100) |
+
+Results under `results/smoke/` come from the pipeline check, not a paper-scale run.
+
+### Outputs
 
 | Command | Output |
 |---|---|
-| `reproduce_figures.py` | `results/<scale>/figures/fig{3..15}.png` and `.json` (mean, 95 % CI, per-seed values) |
-| `reproduce_tables.py` | `parameter_provenance.md`, `comparison.md`, `wilcoxon.md` |
+| `reproduce_figures.py` | `results/<scale>/figures/fig*.png` and `.json` (mean, 95 % CI, per-seed values) |
+| `reproduce_tables.py` | `results/<scale>/tables/{parameter_provenance,comparison,wilcoxon}.md` |
 | `sensitivity_analysis.py` | `results/sensitivity/sensitivity.md` |
-| `cache_capacity_diagnostic.py` | `results/cache_diagnostic/*.png/json` |
+| `cache_capacity_diagnostic.py` | `results/cache_diagnostic/*.png` and `.json` |
 
-Results under `results/smoke/` come from a short pipeline check (4 × 50 steps, 2 seeds), not a paper-scale run.
+## Configuration
 
-## Baselines
+All parameters live in [`configs/paper_default.yaml`](configs/paper_default.yaml). Override any of them from the
+command line:
 
-| Label (paper) | Difference from JORC |
-|---|---|
-| PPO with caching | PPO-clip instead of SAC (on-policy, no entropy-tuned off-policy learning) |
-| DDPG with caching | deterministic actor + Gaussian exploration, single critic |
-| A3C with caching | asynchronous n-step advantage actor-critic, 4 workers |
-| SAC without caching | identical SAC; no cache lookup and no insertion |
-| LFU / LRU / Random | replacement policy only (Figs. 14–15) |
+```bash
+python experiments/reproduce_figures.py --scale reduced --set system.n_users=60 caching.policy=lru
+```
 
-## Random seeds
-
-Seeds 0–9 (`training.seeds`). For each run the seed fixes the task catalogue, UAV layout and torch init;
-episode e uses `SeedSequence([seed, e])` for every method (common random numbers); evaluation uses
-`SeedSequence([seed + 100000, e])`. Raw per-run JSON includes the full config.
-
-## Parameter table (abridged; full table with tags: `results/<scale>/tables/parameter_provenance.md`)
+### Key parameters
 
 | Parameter | Value | Source |
 |---|---|---|
-| N, M, H | 100, 2, 100 m | paper |
-| B, h0 | 20 MHz, −50 dB | paper |
-| D_in, D_out, cycles/bit, L^max | [2,10] Mbit, [0.1,1] Mbit, [600,750], [1,7] s | paper |
-| f_n, F_u, F_b, k | [0.5,0.75] GHz, 10 GHz, 50 GHz, 1e−27 | paper |
-| γ_L = γ_E, E^max | 0.5, 20 J | paper |
-| S_u, S_b, W, η, r_th | 2 GB, 10 GB, 50, 0.05, 0.5 | paper |
-| SAC hyper-parameters | see Algorithm summary | paper |
-| N0 | −174 dBm/Hz | literature (3GPP) |
-| P_max (UD), P_{m,b} (UAV) | 0.2 W, 1 W | literature |
-| θ, UAV positions, user placement | 60°, ring 500 m, in-coverage disks | implementation choice |
-| Task catalogue, popularity | 200 000 tasks, Zipf 0.8 | implementation choice / literature |
-| δ0, δ_min, δ_max | 0.5, 0.1, 0.9 | implementation choice |
+| Users N, UAVs M, altitude H | 100, 2, 100 m | Paper |
+| Bandwidth B, reference gain h₀ | 20 MHz, −50 dB | Paper |
+| Task size, result size | [2, 10] Mbit, [0.1, 1] Mbit | Paper |
+| Workload, deadline | [600, 750] cycles/bit, [1, 7] s | Paper |
+| CPU: device, UAV, BS | [0.5, 0.75] GHz, 10 GHz, 50 GHz | Paper |
+| Energy coefficient k | 10⁻²⁷ | Paper |
+| Cost weights, Eᵐᵃˣ | 0.5 / 0.5, 20 J | Paper |
+| Cache: UAV, BS | 2 GB, 10 GB | Paper |
+| Cache adaptation: W, η, r_th | 50, 0.05, 0.5 | Paper |
+| Noise PSD N₀ | −174 dBm/Hz | Literature (3GPP) |
+| Transmit power: device, UAV | 0.2 W, 1 W | Literature |
+| Beamwidth, UAV layout, user placement | 60°, ring of 500 m, within coverage | Implementation choice |
+| Task catalogue, popularity | 200 000 tasks, Zipf 0.8 | Implementation choice / literature |
+| δ₀, δ_min, δ_max | 0.5, 0.1, 0.9 | Implementation choice |
 
-All implementation choices and literature-derived values are documented in
-[`REPRODUCTION_ASSUMPTIONS.md`](REPRODUCTION_ASSUMPTIONS.md).
+Every parameter's source and rationale is documented in
+[`REPRODUCTION_ASSUMPTIONS.md`](REPRODUCTION_ASSUMPTIONS.md). The full table is generated by `reproduce_tables.py`.
+
+## Reproducibility
+
+- **Seeds:** runs use seeds 0–9 (`training.seeds`). Each seed fixes the task catalogue, UAV layout and network
+  initialisation.
+- **Common random numbers:** episode *e* uses `SeedSequence([seed, e])` for every method, so methods are compared
+  on identical scenarios. Evaluation uses held-out episodes (`SeedSequence([seed + 100000, e])`).
+- **Raw results:** every run saves its full configuration, training history and evaluation metrics as JSON.
+- **Safe interruption:** results are written atomically, so an interrupted sweep never leaves corrupted files.
+- **Statistics:** figures report means with 95 % t-intervals over seeds; JORC is compared with each baseline
+  using paired Wilcoxon signed-rank tests.
+
+## Testing
+
+```bash
+python -m pytest -q tests
+```
+
+| Test file | Covers |
+|---|---|
+| `test_channel.py` | Channel gain, Shannon rate, coverage radius, unit conversions |
+| `test_latency.py` | Local, UAV and BS latency |
+| `test_energy.py` | Transmission and computation energy, cost function |
+| `test_constraints.py` | One-hot offloading, power bounds, CPU capacity, coverage, cache capacity |
+| `test_caching.py` | Hybrid score, δ adaptation, LFU/LRU eviction, variable-size capacity |
+| `test_optimization.py` | SAC target entropy, tanh log-probability, toy convergence, determinism |
+
+## Roadmap
+
+- [x] System model, cost model and constraints
+- [x] SAC agent and hybrid LFU-LRU caching
+- [x] PPO, DDPG, A3C and cache-replacement baselines
+- [x] Experiment pipelines for Figs. 3–15
+- [x] Test suite
+- [ ] Paper-scale training runs for all figures
+- [ ] Published result figures and tables
+- [ ] Pretrained checkpoints
+- [ ] Continuous integration
+
+## Contributing
+
+Contributions are welcome.
+
+1. Open an issue to discuss bugs, questions or proposed changes.
+2. Fork the repository and create a feature branch.
+3. Run `python -m pytest -q tests` before submitting a pull request.
+4. Add new modelling choices as configuration keys with a source tag in `configs/paper_default.yaml`, and
+   document them in `REPRODUCTION_ASSUMPTIONS.md`.
 
 ## Citation
 
@@ -157,6 +291,20 @@ If you use this code, please cite the original paper:
   author  = {Baidya, Tanmay and Moh, Sangman},
   title   = {Joint Task Offloading and Resource Allocation with Data Caching in {UAV}-Aided Mobile Edge
              Computing Networks for Latency-Sensitive Applications},
-  journal = {Sensors}, volume = {26}, pages = {4966}, year = {2026}, doi = {10.3390/s26154966}
+  journal = {Sensors},
+  volume  = {26},
+  pages   = {4966},
+  year    = {2026},
+  doi     = {10.3390/s26154966}
 }
 ```
+
+## License
+
+This project is released under the [MIT License](LICENSE).
+
+## Acknowledgements
+
+This is an independent implementation. Credit for the JORC framework belongs to the original authors,
+T. Baidya and S. Moh. The SAC implementation follows Haarnoja et al., "Soft Actor-Critic Algorithms and
+Applications" (2018).
