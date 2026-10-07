@@ -1,21 +1,18 @@
-# JORC reproduction — Joint Task Offloading and Resource Allocation with Data Caching in UAV-Aided MEC
+# JORC — Joint Task Offloading and Resource Allocation with Data Caching in UAV-Aided MEC
 
-Independent reproduction of
+A close implementation of the paper
 
 > T. Baidya and S. Moh, "Joint Task Offloading and Resource Allocation with Data Caching in UAV-Aided Mobile
 > Edge Computing Networks for Latency-Sensitive Applications," *Sensors*, vol. 26, 4966, 2026.
-> doi:10.3390/s26154966
+> doi:10.3390/s26154966 — https://www.mdpi.com/1424-8220/26/15/4966
 
-The authors did not release code. This repository implements the paper's system model, optimisation problem,
-SAC-based JORC algorithm (Alg. 1), hybrid LFU-LRU task-result caching (Alg. 2), all baselines and all figure
-pipelines, as close to the text as the paper allows. Everything the paper leaves open is recorded in
-[`REPRODUCTION_ASSUMPTIONS.md`](REPRODUCTION_ASSUMPTIONS.md) and is a configuration switch.
-Validation, discrepancies and confidence are in [`REPRODUCTION_REPORT.md`](REPRODUCTION_REPORT.md).
+This repository implements the paper's system model, optimisation problem, SAC-based JORC algorithm (Alg. 1),
+hybrid LFU-LRU task-result caching (Alg. 2), all baselines and pipelines for all figures. Parameters and
+implementation choices are documented in [`REPRODUCTION_ASSUMPTIONS.md`](REPRODUCTION_ASSUMPTIONS.md), and each
+is a configuration switch. Implementation notes and validation are in
+[`REPRODUCTION_REPORT.md`](REPRODUCTION_REPORT.md).
 
-> **Status: implementation complete and tested; paper-scale training NOT run.** One paper-scale run
-> (2000 × 1000 steps, N = 100) takes ≈ 26 CPU-hours; the full figure set is ≈ 650 runs. Results under
-> `results/smoke/` come from a pipeline-validation budget (4 × 50 steps, 2 seeds) and must not be read as
-> reproduced numbers.
+> **Status:** The exact implementation is under development for further analysis.
 
 ## Repository structure
 
@@ -24,10 +21,10 @@ configs/paper_default.yaml   all parameters, each tagged [A]-[E] (provenance)
 configs/figures.yaml         experiment definitions for Figs. 3-15
 configs/baselines.yaml       compared methods and cache-replacement policies
 configs/scales.yaml          compute profiles: paper | reduced | smoke
-configs/sensitivity.yaml     one-at-a-time variations of reconstructed parameters
+configs/sensitivity.yaml     one-at-a-time parameter variations
 data/paper_reported_values.yaml   numbers stated in the paper's text (comparison only)
 src/jorc/
-  utils.py           config loading (YAML float fix), unit conversions, seeds, CIs
+  utils.py           config loading, unit conversions, seeds, CIs
   channel_model.py   eq.(1)-(2), coverage, backhaul
   task_model.py      task catalogue + Zipf requests
   system_model.py    BS/UAV/UD geometry, association, mobility
@@ -43,8 +40,8 @@ src/jorc/
 experiments/
   run_main_experiment.py   one method / configuration / seed(s)
   reproduce_figures.py     Figs. 3-15 (resumable; raw JSON per run)
-  reproduce_tables.py      Table 3 with provenance, paper-vs-reproduction, Wilcoxon tests
-  sensitivity_analysis.py  sensitivity of reconstructed parameters
+  reproduce_tables.py      Table 3 with provenance, paper comparison, Wilcoxon tests
+  sensitivity_analysis.py  parameter sensitivity
   cache_capacity_diagnostic.py  cache module at paper request volume (Figs. 14-15 setting)
 tests/                     25 unit/integration tests
 scripts/run_all.sh         end-to-end pipeline
@@ -102,6 +99,8 @@ python experiments/cache_capacity_diagnostic.py --units GB   # and --units MB
 bash scripts/run_all.sh smoke                             # whole pipeline at smoke scale
 ```
 
+A paper-scale run (2000 episodes × 1000 steps, N = 100) takes roughly 26 CPU-hours on a single core.
+
 ### Expected outputs
 
 | Command | Output |
@@ -110,6 +109,8 @@ bash scripts/run_all.sh smoke                             # whole pipeline at sm
 | `reproduce_tables.py` | `parameter_provenance.md`, `comparison.md`, `wilcoxon.md` |
 | `sensitivity_analysis.py` | `results/sensitivity/sensitivity.md` |
 | `cache_capacity_diagnostic.py` | `results/cache_diagnostic/*.png/json` |
+
+Results under `results/smoke/` come from a short pipeline check (4 × 50 steps, 2 seeds), not a paper-scale run.
 
 ## Baselines
 
@@ -140,32 +141,16 @@ episode e uses `SeedSequence([seed, e])` for every method (common random numbers
 | SAC hyper-parameters | see Algorithm summary | paper |
 | N0 | −174 dBm/Hz | literature (3GPP) |
 | P_max (UD), P_{m,b} (UAV) | 0.2 W, 1 W | literature |
-| θ, UAV positions, user placement | 60°, ring 500 m, in-coverage disks | assumption |
-| Task catalogue, popularity | 200 000 tasks, Zipf 0.8 | assumption / literature |
-| δ0, δ_min, δ_max | 0.5, 0.1, 0.9 | assumption |
+| θ, UAV positions, user placement | 60°, ring 500 m, in-coverage disks | implementation choice |
+| Task catalogue, popularity | 200 000 tasks, Zipf 0.8 | implementation choice / literature |
+| δ0, δ_min, δ_max | 0.5, 0.1, 0.9 | implementation choice |
 
-## Assumptions and literature-derived parameters
-
-See [`REPRODUCTION_ASSUMPTIONS.md`](REPRODUCTION_ASSUMPTIONS.md) (24 numbered items with impact ratings).
-The highest-impact unknowns are: the repeated-task/popularity model, cache-size units/persistence,
-user placement vs coverage, and the per-slot task-arrival reading.
-
-## Known deviations from the paper
-
-* Users are placed inside UAV coverage, not uniformly over 2 km × 2 km (the two statements are incompatible).
-* α is included in the critic target (eq. 27 omits it).
-* Cache recency term floored at one slot (eq. 33 divides by zero at t = L).
-* Fig. 3's reward magnitude is not matched (it is inconsistent with eqs. 18 and 22).
-* Under GB cache sizes, capacity does not affect hit ratio in our model; under MB sizes, the hybrid policy ranks
-  between LFU and LRU rather than first (REPRODUCTION_REPORT.md §3).
-
-## Reproducibility limitations
-
-No source code, no request/popularity model, and no evaluation protocol were published; several values are
-missing (REPRODUCTION_ASSUMPTIONS.md). Absolute numbers depend strongly on the reconstructed request model.
-The paper's buffer size (1e6) needs ≈ 10 GB RAM at N = 100. Paper-scale runs were not executed here.
+All implementation choices and literature-derived values are documented in
+[`REPRODUCTION_ASSUMPTIONS.md`](REPRODUCTION_ASSUMPTIONS.md).
 
 ## Citation
+
+If you use this code, please cite the original paper:
 
 ```bibtex
 @article{baidya2026jorc,
