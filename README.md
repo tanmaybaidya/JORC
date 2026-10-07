@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.png" alt="JORC logo" width="120">
+  <img src="logo.png" alt="JORC logo" width="240">
 </p>
 
 <h1 align="center">JORC</h1>
