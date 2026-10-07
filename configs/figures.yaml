@@ -1,0 +1,35 @@
+# Experiment definitions for every figure of Sec. 6.4 (paper terminology).
+# Fixed parameters come from paper_default.yaml unless overridden here.
+fig3:
+  title: "Convergence of SAC and three other DRL-based baseline algorithms"
+  metric: episode_return            # y: Rewards (sum of R_t over an episode), x: Episodes
+  methods: [JORC, PPO with caching, DDPG with caching, A3C with caching]
+  point: {system: {n_users: 100, n_uavs: 2}}   # N for Fig. 3 is not stated in the paper [C]
+fig4_7_12:
+  title: "Metrics vs. the number of UDs (M = 2)"
+  sweep_key: system.n_users
+  sweep_values: [20, 40, 60, 80, 100, 120]
+  fixed: {system: {n_uavs: 2}}
+  methods: [JORC, PPO with caching, DDPG with caching, A3C with caching, SAC without caching]
+  metrics: {fig4: avg_latency_s, fig5: avg_energy_j, fig6: avg_cost, fig7: stcr, fig12: offloading_ratio}
+fig8_11_13:
+  title: "Metrics vs. the number of UAVs (N = 100)"
+  sweep_key: system.n_uavs
+  sweep_values: [1, 2, 3, 4, 5, 6, 7, 8]
+  fixed: {system: {n_users: 100}}
+  methods: [JORC, PPO with caching, DDPG with caching, A3C with caching, SAC without caching]
+  metrics: {fig8: avg_latency_s, fig9: avg_energy_j, fig10: avg_cost, fig11: stcr, fig13: offloading_ratio}
+fig14:
+  title: "Cache hit ratio vs. UAV caching capacity"
+  sweep_key: caching.uav_capacity_bytes
+  sweep_values_gb: [2, 4, 8, 16, 32]
+  metric: cache_hit_ratio_uav
+  policies: {"Hybrid LRU-LFU (JORC)": hybrid, LFU: lfu, LRU: lru, Random: random}
+  point: {system: {n_users: 100, n_uavs: 2}}
+fig15:
+  title: "Cache hit ratio vs. BS caching capacity"
+  sweep_key: caching.bs_capacity_bytes
+  sweep_values_gb: [10, 20, 40, 80, 160]
+  metric: cache_hit_ratio_bs
+  policies: {"Hybrid LRU-LFU (JORC)": hybrid, LFU: lfu, LRU: lru, Random: random}
+  point: {system: {n_users: 100, n_uavs: 2}}

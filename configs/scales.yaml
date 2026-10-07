@@ -1,0 +1,24 @@
+# Compute profiles. 'paper' = the paper's training budget; the others are for pipeline validation only and
+# DO NOT reproduce the paper's numbers.
+paper:
+  overrides: []
+smoke:
+  overrides:
+    - training.episodes=4
+    - training.steps_per_episode=50
+    - training.seeds=[0,1]
+    - training.eval_episodes=1
+    - training.eval_steps_per_episode=100
+    - sac.buffer_size=20000
+    - ddpg.buffer_size=20000
+    - a3c.n_workers=2
+reduced:
+  overrides:
+    - training.episodes=40
+    - training.steps_per_episode=100
+    - training.seeds=[0,1,2]
+    - training.eval_episodes=1
+    - training.eval_steps_per_episode=200
+    - sac.buffer_size=100000
+    - ddpg.buffer_size=100000
+    - a3c.n_workers=2

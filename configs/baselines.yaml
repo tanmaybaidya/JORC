@@ -1,0 +1,12 @@
+# Baselines evaluated in the paper (Sec. 6.2). See src/jorc/baselines.py for the implementation mapping.
+drl_methods:
+  JORC: {algo: sac, caching: true, cache_policy: hybrid}
+  PPO with caching: {algo: ppo, caching: true, cache_policy: hybrid}
+  DDPG with caching: {algo: ddpg, caching: true, cache_policy: hybrid}
+  A3C with caching: {algo: a3c, caching: true, cache_policy: hybrid}
+  SAC without caching: {algo: sac, caching: false}
+cache_replacement_policies:
+  Hybrid LRU-LFU (JORC): hybrid   # eq.(33) + adaptive delta eq.(34)
+  LFU: lfu                        # evict min access frequency (ties -> least recent) [E tie-break]
+  LRU: lru                        # evict min last-access time
+  Random: random                  # evict a uniformly random entry

@@ -1,0 +1,51 @@
+# Values stated explicitly in the TEXT of Sec. 6.4 (not digitised from plots). Used only for comparison
+# tables; never used to tune parameters. "approx" values are the paper's own "approximately".
+fig3_convergence:   # episodes to stabilise, final average reward
+  JORC: {stabilise_episode: 670, final_reward: -230}
+  PPO with caching: {stabilise_episode: 1000, final_reward: -320}
+  DDPG with caching: {stabilise_episode: 1000, final_reward: -380}
+  A3C with caching: {stabilise_episode: 1350, final_reward: -530}
+vs_users:           # M = 2
+  avg_latency_s:
+    JORC: {20: 1.6, 120: 3.7}
+    SAC without caching: {20: 2.4, 120: 6.4}
+    DRL with caching range: {20: [1.7, 2.0], 120: [4.0, 5.0]}
+  avg_energy_j:
+    JORC: {20: 2.8, 120: 4.55}
+    SAC without caching: {20: 4.1, 120: 7.2}
+    DRL with caching range: {20: [3.0, 3.55], 120: [4.8, 5.5]}
+  avg_cost:
+    JORC: {20: 0.15, 120: 0.43}
+    SAC without caching: {20: 0.31, 120: 0.8}
+    DRL with caching range: {20: [0.16, 0.2], 120: [0.5, 0.7]}
+  stcr:
+    JORC: {20: 0.98, 120: 0.88}
+    SAC without caching: {20: 0.92, 120: 0.7}
+    DRL with caching range: {120: [0.78, 0.85]}
+vs_uavs:            # N = 100
+  avg_latency_s:
+    JORC: {1: 3.4, 5: 1.8, 8: 1.7}
+  avg_energy_j:
+    JORC: {1: 4.9, 5: 3.9}
+  avg_cost:
+    JORC: {1: 0.46, 6: 0.17}
+    SAC without caching: {1: 0.75}
+    DRL with caching range: {8: [0.18, 0.2]}
+  stcr:
+    JORC: {1: 0.84, 5: 0.965, 8: 0.97}
+    SAC without caching: {1: 0.70, 8: 0.86}
+    DRL with caching range: {8: [0.93, 0.96]}
+cache_hit_ratio_uav:  # capacity in GB
+  Hybrid LRU-LFU (JORC): {2: 0.4, 32: 0.9}
+  LFU: {2: 0.33, 32: 0.82}
+  LRU: {2: 0.3, 32: 0.8}
+  Random: {2: 0.18, 32: 0.72}
+cache_hit_ratio_bs:
+  Hybrid LRU-LFU (JORC): {10: 0.6, 160: 0.95}
+  LFU: {10: 0.53, 160: 0.9}
+  LRU: {10: 0.51, 160: 0.89}
+  Random: {10: 0.38, 160: 0.8}
+# Internal inconsistencies noted while transcribing:
+# - Sec. 6.4.2 text (Fig. 12): "JORC achieved the highest offloading ratio" and also "SAC without caching
+#   exhibited the highest offloading ratio"; Fig. 12/13 bars and the Fig. 13 text support the latter.
+# - Fig. 14 text gives JORC 0.9 at 32 GB; the plotted marker is ~0.87.

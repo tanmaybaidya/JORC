@@ -1,0 +1,11 @@
+name: jorc-repro
+channels: [pytorch, conda-forge]
+dependencies:
+  - python=3.12
+  - numpy
+  - scipy
+  - pyyaml
+  - matplotlib
+  - pytorch>=2.0
+  - cpuonly
+  - pytest

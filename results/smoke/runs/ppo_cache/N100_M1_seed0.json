@@ -1,0 +1,215 @@
+{
+  "method": "PPO with caching",
+  "seed": 0,
+  "config": {
+    "system": {
+      "n_users": 100,
+      "n_uavs": 1,
+      "uav_altitude_m": 100.0,
+      "area_side_m": 2000.0,
+      "bs_position_m": [
+        0.0,
+        0.0
+      ],
+      "area_centered_on_bs": true,
+      "uav_layout": "ring",
+      "uav_ring_radius_m": 500.0,
+      "beamwidth_deg": 60.0,
+      "user_placement": "coverage_disk",
+      "user_association": "round_robin",
+      "resample_positions_each_step": true
+    },
+    "communication": {
+      "bandwidth_hz": 20000000.0,
+      "bandwidth_scope": "per_uav",
+      "bandwidth_split": "equal_associated",
+      "h0_db": -50.0,
+      "noise_psd_dbm_per_hz": -174.0,
+      "ud_pmax_w": 0.2,
+      "ud_pmin_w": 0.001,
+      "uav_tx_power_w": 1.0,
+      "backhaul_mode": "shannon_los",
+      "backhaul_bandwidth_hz": 20000000.0,
+      "backhaul_rate_bps": 100000000.0
+    },
+    "computation": {
+      "ud_freq_hz": [
+        500000000.0,
+        750000000.0
+      ],
+      "uav_freq_hz": 10000000000.0,
+      "bs_freq_hz": 50000000000.0,
+      "kappa": 1e-27,
+      "s_min": 0.01,
+      "capacity_projection": "proportional"
+    },
+    "task": {
+      "din_bits": [
+        2000000.0,
+        10000000.0
+      ],
+      "dout_bits": [
+        100000.0,
+        1000000.0
+      ],
+      "cycles_per_bit": [
+        600.0,
+        750.0
+      ],
+      "lmax_s": [
+        1.0,
+        7.0
+      ],
+      "emax_j": 20.0,
+      "library_size": 200000,
+      "zipf_exponent": 0.8,
+      "lmax_per_request": false
+    },
+    "cost": {
+      "gamma_latency": 0.5,
+      "gamma_energy": 0.5,
+      "latency_normalizer": "deadline",
+      "latency_normalizer_value_s": 7.0,
+      "hit_latency_s": 0.0,
+      "hit_energy_j": 0.0,
+      "reward_aggregation": "sum",
+      "deadline_penalty": 0.0
+    },
+    "caching": {
+      "enabled": true,
+      "uav_capacity_bytes": 2000000000.0,
+      "bs_capacity_bytes": 10000000000.0,
+      "entry_size": "dout",
+      "policy": "hybrid",
+      "window_slots": 50,
+      "eta": 0.05,
+      "r_th": 0.5,
+      "delta0": 0.5,
+      "delta_min": 0.1,
+      "delta_max": 0.9,
+      "adaptive_delta": true,
+      "lookup": "uav_then_bs",
+      "reset_each_episode": true,
+      "recency_floor_slots": 1.0
+    },
+    "training": {
+      "episodes": 4,
+      "steps_per_episode": 50,
+      "seeds": [
+        0,
+        1
+      ],
+      "eval_episodes": 1,
+      "eval_steps_per_episode": 100,
+      "eval_seed_offset": 100000,
+      "torch_threads": 1
+    },
+    "sac": {
+      "hidden": [
+        400,
+        400,
+        400
+      ],
+      "lr": 0.0001,
+      "gamma": 0.8,
+      "tau": 0.005,
+      "buffer_size": 20000,
+      "batch_size": 64,
+      "alpha0": 0.2,
+      "target_entropy_per_action_dim": -1.0,
+      "updates_per_step": 1,
+      "update_every": 1,
+      "learning_starts": 64,
+      "alpha_parameterization": "log"
+    },
+    "ddpg": {
+      "hidden": [
+        400,
+        400,
+        400
+      ],
+      "lr": 0.0001,
+      "gamma": 0.8,
+      "tau": 0.005,
+      "buffer_size": 20000,
+      "batch_size": 64,
+      "exploration_noise_std": 0.1,
+      "learning_starts": 64
+    },
+    "ppo": {
+      "hidden": [
+        400,
+        400,
+        400
+      ],
+      "lr": 0.0001,
+      "gamma": 0.8,
+      "gae_lambda": 0.95,
+      "clip": 0.2,
+      "epochs": 10,
+      "minibatch_size": 64,
+      "value_coef": 0.5,
+      "entropy_coef": 0.0,
+      "max_grad_norm": 0.5,
+      "init_log_std": -0.5
+    },
+    "a3c": {
+      "hidden": [
+        400,
+        400,
+        400
+      ],
+      "lr": 0.0001,
+      "gamma": 0.8,
+      "n_workers": 2,
+      "t_max": 20,
+      "entropy_beta": 0.0001,
+      "value_coef": 0.5,
+      "max_grad_norm": 40.0
+    }
+  },
+  "history": {
+    "episode_return": [
+      -18058.185941983724,
+      -14699.976333162242,
+      -15207.359259269948,
+      -17392.462199605816
+    ],
+    "avg_cost": [
+      3.611637188396745,
+      2.9399952666324483,
+      3.0414718518539896,
+      3.478492439921163
+    ],
+    "stcr": [
+      0.349,
+      0.368,
+      0.3478,
+      0.3618
+    ],
+    "wall_s": [
+      0.3771982192993164,
+      0.7888407707214355,
+      1.180959939956665,
+      1.5525307655334473
+    ]
+  },
+  "eval": {
+    "avg_latency_s": 5.7365936763187335,
+    "avg_energy_j": 4.674843028857786,
+    "avg_cost": 1.0417408633199028,
+    "stcr": 0.431,
+    "offloading_ratio": 0.5014,
+    "local_ratio": 0.275,
+    "uav_exec_ratio": 0.2394,
+    "bs_exec_ratio": 0.262,
+    "overall_hit_ratio": 0.2236,
+    "cache_hit_ratio_uav": 0.1036,
+    "cache_hit_ratio_bs": 0.13386880856760375,
+    "max_server_load": 1.0000000000000002,
+    "min_power_w": 0.08339270551502705,
+    "n_tasks": 10000.0,
+    "deadline_violations": 5689.999999999999
+  },
+  "train_seconds": 1.5865333080291748
+}

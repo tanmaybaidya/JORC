@@ -1,0 +1,17 @@
+# One-at-a-time variations of reconstructed ([C]/[D]/[E]) parameters around paper_default.yaml.
+# Each entry: name -> list of override lists. Evaluated with JORC and SAC without caching (Sec. 7 conclusion
+# "caching helps") plus the training-free diagnostic policies of experiments/sensitivity_analysis.py.
+variations:
+  noise_psd_dbm_per_hz: [[communication.noise_psd_dbm_per_hz=-174], [communication.noise_psd_dbm_per_hz=-164]]
+  ud_pmax_w: [[communication.ud_pmax_w=0.1], [communication.ud_pmax_w=0.5]]
+  beamwidth_deg: [[system.beamwidth_deg=45], [system.beamwidth_deg=75]]
+  backhaul: [[communication.backhaul_mode=fixed, communication.backhaul_rate_bps=20.0e6],
+             [communication.backhaul_mode=fixed, communication.backhaul_rate_bps=100.0e6]]
+  bandwidth_scope: [[communication.bandwidth_scope=shared]]
+  library_size: [[task.library_size=1000], [task.library_size=20000], [task.library_size=2000000]]
+  zipf_exponent: [[task.zipf_exponent=0.5], [task.zipf_exponent=1.0]]
+  latency_normalizer: [[cost.latency_normalizer=constant]]
+  reward_aggregation: [[cost.reward_aggregation=mean]]
+  cache_entry_size: [[caching.entry_size=din_plus_dout]]
+  cache_units_MB: [[caching.uav_capacity_bytes=2.0e6, caching.bs_capacity_bytes=10.0e6]]
+  user_placement: [[system.user_placement=uniform_area]]
